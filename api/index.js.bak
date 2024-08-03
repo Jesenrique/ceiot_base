@@ -63,21 +63,6 @@ app.post('/device-json', express.json(), function (req, res) {
     res.send("received new device");
 });
 
-
-// Borrar dispositivo
-app.post('/delete/:id', express.json(), function (req, res) {
-    // req.body contendrá el objeto JSON parseado
-	try{
-    db.public.none("DELETE FROM devices WHERE device_id = '"+req.params.id+"'");
-	res.send("Device was deleted");
-	}
-	catch(error){
-	console.error("Error deleting device:", error);
-    res.status(500).send("Error deleting device");
-	}
-});
-
-
 app.get('/web/device', function (req, res) {
 	var devices = db.public.many("SELECT * FROM devices").map( function(device) {
 		console.log(device);
