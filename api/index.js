@@ -55,6 +55,14 @@ app.post('/device', function (req, res) {
 });
 
 
+// Ruta que requiere parseo JSON
+app.post('/device-json', express.json(), function (req, res) {
+    // req.body contendrá el objeto JSON parseado
+    console.log(req.body);
+    console.log("device id    : " + req.body.id + " name        : " + req.body.n + " key         : " + req.body.k );
+    res.send("received new device");
+});
+
 app.get('/web/device', function (req, res) {
 	var devices = db.public.many("SELECT * FROM devices").map( function(device) {
 		console.log(device);
