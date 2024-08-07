@@ -60,6 +60,7 @@ app.post('/device-json', express.json(), function (req, res) {
     // req.body contendrá el objeto JSON parseado
     console.log(req.body);
     console.log("device id    : " + req.body.id + " name        : " + req.body.n + " key         : " + req.body.k );
+    db.public.none("INSERT INTO devices VALUES ('"+req.body.id+ "', '"+req.body.n+"', '"+req.body.k+"')");
     res.send("received new device");
 });
 
@@ -75,6 +76,26 @@ app.post('/delete/:id', express.json(), function (req, res) {
 	console.error("Error deleting device:", error);
     res.status(500).send("Error deleting device");
 	}
+});
+
+//Actualizar dispositivo
+app.put('/update/:id', express.json(), function (req, res) {
+    console.log(req.body);
+    try {
+        // Completa la consulta SQL y usa parámetros para prevenir inyecciones SQL
+        db.public.none(
+            "UPDATE devices SET name = $1, key = $2 WHERE device_id = $3",
+            [req.body.name, req.body.key, req.params.id]
+        ).then(() => {
+            res.send("Device was updated");
+        }).catch(error => {
+            console.error("Error updating device:", error);
+            res.status(500).send("Error updating device");
+        });
+    } catch (error) {
+        console.error("Error updating device:", error);
+        res.status(500).send("Error updating device");
+    }
 });
 
 
