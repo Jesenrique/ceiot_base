@@ -41,15 +41,15 @@ app.use(express.static('spa/static'));
 
 const PORT = 8080;
 
-app.post('/measurement', function (req, res) {
--       console.log("device id    : " + req.body.id + " key         : " + req.body.key + " temperature : " + req.body.t + " humidity    : " + req.body.h);	
-    const {insertedId} = insertMeasurement({id:req.body.id, t:req.body.t, h:req.body.h});
+app.post('/measurement', express.json(), function (req, res) {
+	console.log(req.body);
+-   console.log("device id    : " + req.body.id + " key         : " + req.body.k + " temperature : " + req.body.t + " humidity    : " + req.body.h);	
+    const {insertedId} = insertMeasurement({id:req.body.id, t:req.body.t, h:req.body.h,timestap:get_timestap()});
 	res.send("received measurement into " +  insertedId);
 });
 
 app.post('/device', function (req, res) {
 	console.log("device id    : " + req.body.id + " name        : " + req.body.n + " key         : " + req.body.k );
-
     db.public.none("INSERT INTO devices VALUES ('"+req.body.id+ "', '"+req.body.n+"', '"+req.body.k+"')");
 	res.send("received new device");
 });
@@ -66,10 +66,11 @@ app.post('/device-json', express.json(), function (req, res) {
 
 
 // Borrar dispositivo
-app.post('/delete/:id', express.json(), function (req, res) {
+app.delete('/delete', express.json(), function (req, res) {
     // req.body contendrá el objeto JSON parseado
+	console.log(req.body)
 	try{
-    db.public.none("DELETE FROM devices WHERE device_id = '"+req.params.id+"'");
+    db.public.none("DELETE FROM devices WHERE device_id = '"+req.body.id+"'");
 	res.send("Device was deleted");
 	}
 	catch(error){
@@ -79,24 +80,20 @@ app.post('/delete/:id', express.json(), function (req, res) {
 });
 
 //Actualizar dispositivo
-app.put('/update/:id', express.json(), function (req, res) {
+app.put('/update', express.json(), function (req, res) {
+    // req.body contendrá el objeto JSON parseado
     console.log(req.body);
-    try {
-        // Completa la consulta SQL y usa parámetros para prevenir inyecciones SQL
-        db.public.none(
-            "UPDATE devices SET name = $1, key = $2 WHERE device_id = $3",
-            [req.body.name, req.body.key, req.params.id]
-        ).then(() => {
-            res.send("Device was updated");
-        }).catch(error => {
-            console.error("Error updating device:", error);
-            res.status(500).send("Error updating device");
-        });
-    } catch (error) {
-        console.error("Error updating device:", error);
-        res.status(500).send("Error updating device");
-    }
+    console.log("device id    : " + req.body.id + " name        : " + req.body.n + " key         : " + req.body.k );
+    db.public.none("UPDATE devices SET name='" + req.body.n + "', key='" + req.body.k + "' WHERE device_id='" + req.body.id + "'");
+    res.send("device update");
 });
+
+//obtener timestap
+	const get_timestap = function() {
+	const fecha = new Date();
+	const timestamp = fecha .getTime();
+	return timestamp;
+};
 
 
 app.get('/web/device', function (req, res) {
@@ -160,10 +157,10 @@ startDatabase().then(async() => {
     const addAdminEndpoint = require("./admin.js");
     addAdminEndpoint(app, render);
 
-    await insertMeasurement({id:'00', t:'18', h:'78'});
-    await insertMeasurement({id:'00', t:'19', h:'77'});
-    await insertMeasurement({id:'00', t:'17', h:'77'});
-    await insertMeasurement({id:'01', t:'17', h:'77'});
+    await insertMeasurement({id:'00', t:'18', h:'78', timestap:get_timestap()});
+    await insertMeasurement({id:'00', t:'19', h:'77', timestap:get_timestap()});
+    await insertMeasurement({id:'00', t:'17', h:'77', timestap:get_timestap()});
+    await insertMeasurement({id:'01', t:'17', h:'77', timestap:get_timestap()});
     console.log("mongo measurement database Up");
 
     db.public.none("CREATE TABLE devices (device_id VARCHAR, name VARCHAR, key VARCHAR)");

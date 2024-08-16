@@ -1,0 +1,150 @@
+#include <WiFi.h>
+#include "DHTesp.h"
+#include <HTTPClient.h>
+#include <ArduinoJson.h>
+
+// Configuración de Wi-Fi
+const char* ssid = "Jeerez";
+const char* password = "2jere.001";
+
+// Configuración del sensor DHT
+#define DHTpin 15    // Pin GPIO conectado al DHT11 o DHT22
+DHTesp dht;
+
+// URL del servidor
+const char* serverName = "http://192.168.1.8:8080/devices";
+
+// Variables para datos del sensor y MAC Address
+float humidity, temperature, temp_city;
+String jsonString;
+String macAddress;
+
+void setup() {
+  // Inicializa el sensor DHT
+  dht.setup(DHTpin, DHTesp::DHT22); // Para DHT22, usa DHTesp::DHT22
+
+  // Inicializa la comunicación serie
+  Serial.begin(115200);
+  Serial.println();
+
+  // Configura la conexión Wi-Fi
+  WiFi.mode(WIFI_STA);
+  WiFi.setSleep(false); // Desactiva la suspensión de Wi-Fi
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("Conectado a Wi-Fi");
+  Serial.print("Dirección IP: ");
+  Serial.println(WiFi.localIP());
+
+  // Obtén la dirección MAC del ESP32
+  macAddress = WiFi.macAddress();
+  Serial.print("Dirección MAC: ");
+  Serial.println(macAddress);
+}
+
+void loop() {
+  // Lee la humedad y la temperatura
+  humidity = dht.readHumidity();
+  temperature = dht.readTemperature();
+  Serial.println("Humedad: " + String(humidity) + " --- Temperatura: " + String(temperature));
+  temp_city=makeWeatherRequest();
+
+  // Crea el objeto JSON
+  DynamicJsonDocument doc(1024);
+
+  // Agrega variables al JSON
+  doc["device_id"] = macAddress;    
+  doc["temperature"] = temperature; 
+  doc["humidity"] = humidity;   
+  doc["temp_city"] = temp_city;   
+
+  // Serializa JSON a una cadena
+  serializeJson(doc, jsonString);
+
+  // Imprime el JSON generado
+  Serial.println("JSON generado:");
+  Serial.println(jsonString);
+
+  // Realiza la solicitud POST
+  if (WiFi.status() == WL_CONNECTED) {
+    HTTPClient http;
+
+    // Inicia la conexión
+    http.begin(serverName);
+
+    // Especifica el tipo de contenido (en este caso JSON)
+    http.addHeader("Content-Type", "application/json");
+
+    // Realiza la solicitud POST y recibe el código de respuesta
+    int httpResponseCode = http.POST(jsonString);
+
+    // Verifica el resultado de la petición
+    if (httpResponseCode > 0) {
+      // Imprime el código de respuesta y la respuesta del servidor
+      String response = http.getString();
+      Serial.print("Código de respuesta: ");
+      Serial.println(httpResponseCode);
+      Serial.print("Respuesta del servidor: ");
+      Serial.println(response);
+    } else {
+      // Si hubo un error en la petición, imprime el código de error
+      Serial.print("Error en la petición: ");
+      Serial.println(httpResponseCode);
+    }
+
+    // Finaliza la conexión
+    http.end();
+  } else {
+    Serial.println("Error de conexión Wi-Fi");
+  }
+
+  // Espera antes de la próxima lectura
+  delay(8000);
+}
+
+
+float makeWeatherRequest() {
+  float temperature = 0.0; // Inicializa la variable de temperatura
+
+  if (WiFi.status() == WL_CONNECTED) {
+    HTTPClient http;
+
+    
+    String serverPath = "https://api.openweathermap.org/data/2.5/weather?lat=7.13&lon=-73.12&appid=65127c2f99910e248baf6ea092e49959&units=metric";
+
+    http.begin(serverPath.c_str());
+    int httpResponseCode = http.GET();
+
+    if (httpResponseCode > 0) {
+      String payload = http.getString();
+      Serial.println("Respuesta del servidor:");
+      Serial.println(payload);
+
+      DynamicJsonDocument doc(1024);
+      DeserializationError error = deserializeJson(doc, payload);
+
+      if (error) {
+        Serial.print("Error al analizar JSON: ");
+        Serial.println(error.c_str());
+        return temperature;
+      }
+
+      temperature = doc["main"]["temp"].as<float>();
+
+      Serial.print("Temperatura: ");
+      Serial.println(temperature);
+    } else {
+      Serial.print("Error en la petición: ");
+      Serial.println(httpResponseCode);
+    }
+
+    http.end();
+  } else {
+    Serial.println("Error de conexión Wi-Fi");
+  }
+
+  return temperature; 
+}
